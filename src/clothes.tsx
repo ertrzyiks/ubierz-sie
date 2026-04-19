@@ -20,14 +20,14 @@ export const clothingItems: ClothingItem[] = [
     svgLayer: (
       <g key="czapka-zimowa">
         <path
-          d="M 172 20 Q 172 -6 210 -6 Q 248 -6 248 20 L 248 24 L 172 24 Z"
+          d="M 172 26 Q 172 0 210 0 Q 248 0 248 26 L 248 30 L 172 30 Z"
           fill="#b63f34"
           stroke="#74261f"
           strokeWidth="2"
         />
         <rect
           x="166"
-          y="19"
+          y="25"
           width="88"
           height="13"
           rx="6"
@@ -36,13 +36,13 @@ export const clothingItems: ClothingItem[] = [
           strokeWidth="1.5"
         />
         <path
-          d="M 176 12 Q 210 4 244 12"
+          d="M 176 18 Q 210 10 244 18"
           fill="none"
           stroke="#d96f65"
           strokeWidth="2"
           opacity="0.7"
         />
-        <circle cx="210" cy="-7" r="9" fill="#e2776e" stroke="#8a322a" strokeWidth="1.5" />
+        <circle cx="210" cy="4" r="8" fill="#e2776e" stroke="#8a322a" strokeWidth="1.5" />
       </g>
     ),
   },
@@ -52,17 +52,17 @@ export const clothingItems: ClothingItem[] = [
     svgLayer: (
       <g key="czapka-letnia">
         <path
-          d="M 172 22 Q 172 -8 210 -8 Q 248 -8 248 22 Z"
+          d="M 172 28 Q 172 0 210 0 Q 248 0 248 28 Z"
           fill="#2f9d63"
           stroke="#1f6d45"
           strokeWidth="2"
         />
         <path
-          d="M 172 22 Q 154 28 154 21 Q 158 9 177 14 Z"
+          d="M 172 28 Q 154 34 154 27 Q 158 15 177 20 Z"
           fill="#1f6d45"
         />
-        <ellipse cx="210" cy="22" rx="38" ry="6.5" fill="#207449" />
-        <path d="M 206 -4 L 214 -4 L 214 16" stroke="#165235" strokeWidth="2" />
+        <ellipse cx="210" cy="28" rx="38" ry="6.5" fill="#207449" />
+        <path d="M 206 2 L 214 2 L 214 22" stroke="#165235" strokeWidth="2" />
       </g>
     ),
   },
