@@ -16,6 +16,65 @@ type GameState =
 
 type MobileTab = "preview" | "sidebar";
 
+type QueueRule = {
+  itemId: string;
+  after: string[];
+};
+
+const queueRules: QueueRule[] = [
+  { itemId: "buty", after: ["skarpetki"] },
+  { itemId: "kurtka", after: ["bluza", "koszulka"] },
+];
+
+function buildGameQueue(selectedIds: string[]) {
+  const uniqueSelectedIds = Array.from(new Set(selectedIds));
+  const selectedSet = new Set(uniqueSelectedIds);
+  const indegree = new Map<string, number>();
+  const graph = new Map<string, string[]>();
+
+  for (const id of uniqueSelectedIds) {
+    indegree.set(id, 0);
+    graph.set(id, []);
+  }
+
+  for (const rule of queueRules) {
+    if (!selectedSet.has(rule.itemId)) continue;
+
+    for (const dependencyId of rule.after) {
+      if (!selectedSet.has(dependencyId)) continue;
+
+      graph.get(dependencyId)?.push(rule.itemId);
+      indegree.set(rule.itemId, (indegree.get(rule.itemId) ?? 0) + 1);
+    }
+  }
+
+  const available = uniqueSelectedIds.filter((id) => (indegree.get(id) ?? 0) === 0);
+  const queue: string[] = [];
+
+  while (available.length > 0) {
+    const randomIndex = Math.floor(Math.random() * available.length);
+    const [nextId] = available.splice(randomIndex, 1);
+
+    if (!nextId) break;
+
+    queue.push(nextId);
+
+    for (const dependentId of graph.get(nextId) ?? []) {
+      const nextDegree = (indegree.get(dependentId) ?? 0) - 1;
+      indegree.set(dependentId, nextDegree);
+
+      if (nextDegree === 0) {
+        available.push(dependentId);
+      }
+    }
+  }
+
+  // Fallback preserves gameplay even if future rules create a cycle.
+  if (queue.length !== uniqueSelectedIds.length) return uniqueSelectedIds;
+
+  return queue;
+}
+
 function App() {
   const [activePreset, setActivePreset] = useState<Preset>(presets[0]);
   const [checked, setChecked] = useState<Set<string>>(
@@ -164,10 +223,13 @@ function App() {
   }
 
   function startGame() {
-    const queue = clothingItems
+    const selectedIds = clothingItems
       .filter((item) => checked.has(item.id))
       .map((item) => item.id);
+    const queue = buildGameQueue(selectedIds);
+
     if (queue.length === 0) return;
+
     setChecked(new Set());
     startShuffle(queue, 0);
   }

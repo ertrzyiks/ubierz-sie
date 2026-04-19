@@ -129,6 +129,18 @@ export const clothingItems: ClothingItem[] = [
       </g>
     ),
   },
+  {
+    id: "skarpetki",
+    label: "Skarpetki",
+    svgLayer: (
+      <g key="skarpetki">
+        <rect x="170" y="328" width="14" height="16" rx="2" fill="#f5f5f5" />
+        <rect x="194" y="328" width="14" height="16" rx="2" fill="#f5f5f5" />
+        <rect x="220" y="328" width="14" height="16" rx="2" fill="#f5f5f5" />
+        <rect x="244" y="328" width="14" height="16" rx="2" fill="#f5f5f5" />
+      </g>
+    ),
+  },
 ];
 
 export const presets: Preset[] = [
@@ -141,6 +153,7 @@ export const presets: Preset[] = [
       "szalik",
       "kurtka",
       "spodnie",
+      "skarpetki",
       "buty",
       "rekawiczki",
     ],
@@ -149,18 +162,18 @@ export const presets: Preset[] = [
     id: "lato",
     label: "Lato",
     emoji: "☀️",
-    itemIds: ["czapka-letnia", "koszulka", "spodenki", "buty"],
+    itemIds: ["czapka-letnia", "koszulka", "spodenki", "skarpetki", "buty"],
   },
   {
     id: "jesien",
     label: "Jesień",
     emoji: "🍂",
-    itemIds: ["bluza", "spodnie", "buty"],
+    itemIds: ["bluza", "spodnie", "skarpetki", "buty"],
   },
   {
     id: "pusto",
     label: "Pusto",
     emoji: "🫥",
-    itemIds: [],
+    itemIds: ["skarpetki"],
   },
 ];
