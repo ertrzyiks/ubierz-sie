@@ -1,18 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { buildGameQueue } from "./buildGameQueue";
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-/** Returns true if every value in `later` comes after every value in `before` within `queue`. */
-function allBefore(
-  queue: string[],
-  before: string[],
-  later: string[],
-): boolean {
-  const lastBefore = Math.max(...before.map((id) => queue.indexOf(id)));
-  const firstLater = Math.min(...later.map((id) => queue.indexOf(id)));
-  return lastBefore < firstLater;
-}
 
 // ── tests ────────────────────────────────────────────────────────────────────
 
