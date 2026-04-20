@@ -1,8 +1,13 @@
 import type { ReactElement } from "react";
 
+export type ClothingBodyPart = "head" | "torso" | "hands" | "legs" | "feet";
+
 export interface ClothingItem {
   id: string;
   label: string;
+  bodyPart: ClothingBodyPart;
+  /** Layer index on the body — lower = closer to skin. Items sharing the same bodyPart+layer are mutually exclusive. */
+  layer: number;
   svgLayer: ReactElement;
 }
 
@@ -17,6 +22,8 @@ export const clothingItems: ClothingItem[] = [
   {
     id: "czapka-zimowa",
     label: "Czapka zimowa",
+    bodyPart: "head",
+    layer: 2,
     svgLayer: (
       <g key="czapka-zimowa">
         <path
@@ -42,13 +49,22 @@ export const clothingItems: ClothingItem[] = [
           strokeWidth="2"
           opacity="0.7"
         />
-        <circle cx="210" cy="4" r="8" fill="#e2776e" stroke="#8a322a" strokeWidth="1.5" />
+        <circle
+          cx="210"
+          cy="4"
+          r="8"
+          fill="#e2776e"
+          stroke="#8a322a"
+          strokeWidth="1.5"
+        />
       </g>
     ),
   },
   {
     id: "czapka-letnia",
     label: "Czapka z daszkiem",
+    bodyPart: "head",
+    layer: 2,
     svgLayer: (
       <g key="czapka-letnia">
         <path
@@ -57,18 +73,57 @@ export const clothingItems: ClothingItem[] = [
           stroke="#1f6d45"
           strokeWidth="2"
         />
-        <path
-          d="M 172 28 Q 154 34 154 27 Q 158 15 177 20 Z"
-          fill="#1f6d45"
-        />
+        <path d="M 172 28 Q 154 34 154 27 Q 158 15 177 20 Z" fill="#1f6d45" />
         <ellipse cx="210" cy="28" rx="38" ry="6.5" fill="#207449" />
         <path d="M 206 2 L 214 2 L 214 22" stroke="#165235" strokeWidth="2" />
       </g>
     ),
   },
   {
+    id: "czapka-jesienna",
+    label: "Czapka jesienna",
+    bodyPart: "head",
+    layer: 2,
+    svgLayer: (
+      <g key="czapka-jesienna">
+        <path
+          d="M 172 28 Q 172 2 210 2 Q 248 2 248 28 L 248 32 L 172 32 Z"
+          fill="#c8742a"
+          stroke="#8a4f1b"
+          strokeWidth="2"
+        />
+        <rect
+          x="166"
+          y="27"
+          width="88"
+          height="12"
+          rx="6"
+          fill="#9c5b21"
+          stroke="#6f3f16"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M 178 18 Q 210 12 242 18"
+          fill="none"
+          stroke="#e0a35d"
+          strokeWidth="2"
+          opacity="0.75"
+        />
+        <path
+          d="M 204 5 Q 210 0 216 5"
+          fill="none"
+          stroke="#7b4318"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </g>
+    ),
+  },
+  {
     id: "szalik",
     label: "Szalik",
+    bodyPart: "torso",
+    layer: 5,
     svgLayer: (
       <g key="szalik">
         <path
@@ -83,14 +138,31 @@ export const clothingItems: ClothingItem[] = [
           stroke="#5c2d78"
           strokeWidth="2"
         />
-        <line x1="189" y1="101" x2="232" y2="101" stroke="#a96bc7" strokeWidth="2" opacity="0.7" />
-        <line x1="205" y1="166" x2="216" y2="166" stroke="#caa1dd" strokeWidth="2" />
+        <line
+          x1="189"
+          y1="101"
+          x2="232"
+          y2="101"
+          stroke="#a96bc7"
+          strokeWidth="2"
+          opacity="0.7"
+        />
+        <line
+          x1="205"
+          y1="166"
+          x2="216"
+          y2="166"
+          stroke="#caa1dd"
+          strokeWidth="2"
+        />
       </g>
     ),
   },
   {
     id: "kurtka",
     label: "Kurtka",
+    bodyPart: "torso",
+    layer: 4,
     svgLayer: (
       <g key="kurtka">
         <path
@@ -99,10 +171,27 @@ export const clothingItems: ClothingItem[] = [
           stroke="#1f2b35"
           strokeWidth="2"
         />
-        <path d="M 14 150 Q 72 144 158 152 L 158 184 Q 70 180 14 186 Z" fill="#2f4152" stroke="#1f2b35" strokeWidth="2" />
-        <path d="M 406 150 Q 348 144 262 152 L 262 184 Q 350 180 406 186 Z" fill="#2f4152" stroke="#1f2b35" strokeWidth="2" />
+        <path
+          d="M 14 150 Q 72 144 158 152 L 158 184 Q 70 180 14 186 Z"
+          fill="#2f4152"
+          stroke="#1f2b35"
+          strokeWidth="2"
+        />
+        <path
+          d="M 406 150 Q 348 144 262 152 L 262 184 Q 350 180 406 186 Z"
+          fill="#2f4152"
+          stroke="#1f2b35"
+          strokeWidth="2"
+        />
         <path d="M 196 138 L 210 160 L 224 138" fill="#3f5569" />
-        <line x1="210" y1="142" x2="210" y2="246" stroke="#b7c4cf" strokeWidth="3" />
+        <line
+          x1="210"
+          y1="142"
+          x2="210"
+          y2="246"
+          stroke="#b7c4cf"
+          strokeWidth="3"
+        />
         <circle cx="210" cy="170" r="2" fill="#dbe4ea" />
         <circle cx="210" cy="186" r="2" fill="#dbe4ea" />
         <circle cx="210" cy="202" r="2" fill="#dbe4ea" />
@@ -112,6 +201,8 @@ export const clothingItems: ClothingItem[] = [
   {
     id: "bluza",
     label: "Bluza",
+    bodyPart: "torso",
+    layer: 3,
     svgLayer: (
       <g key="bluza">
         <path
@@ -120,16 +211,36 @@ export const clothingItems: ClothingItem[] = [
           stroke="#4d5860"
           strokeWidth="2"
         />
-        <path d="M 100 150 Q 126 146 158 152 L 158 180 Q 124 178 100 182 Z" fill="#6e7c87" stroke="#4d5860" strokeWidth="2" />
-        <path d="M 320 150 Q 294 146 262 152 L 262 180 Q 296 178 320 182 Z" fill="#6e7c87" stroke="#4d5860" strokeWidth="2" />
+        <path
+          d="M 78 150 Q 118 145 158 152 L 158 180 Q 116 179 78 184 Z"
+          fill="#6e7c87"
+          stroke="#4d5860"
+          strokeWidth="2"
+        />
+        <path
+          d="M 342 150 Q 302 145 262 152 L 262 180 Q 304 179 342 184 Z"
+          fill="#6e7c87"
+          stroke="#4d5860"
+          strokeWidth="2"
+        />
         <rect x="186" y="136" width="48" height="12" rx="4" fill="#55616b" />
-        <line x1="210" y1="152" x2="210" y2="240" stroke="#83919c" strokeWidth="2" opacity="0.55" />
+        <line
+          x1="210"
+          y1="152"
+          x2="210"
+          y2="240"
+          stroke="#83919c"
+          strokeWidth="2"
+          opacity="0.55"
+        />
       </g>
     ),
   },
   {
     id: "koszulka",
     label: "Koszulka",
+    bodyPart: "torso",
+    layer: 2,
     svgLayer: (
       <g key="koszulka">
         <path
@@ -138,15 +249,32 @@ export const clothingItems: ClothingItem[] = [
           stroke="#2f7fae"
           strokeWidth="2"
         />
-        <path d="M 110 150 Q 132 148 158 156 L 158 178 Q 132 176 110 178 Z" fill="#53a8da" stroke="#2f7fae" strokeWidth="2" />
-        <path d="M 310 150 Q 288 148 262 156 L 262 178 Q 288 176 310 178 Z" fill="#53a8da" stroke="#2f7fae" strokeWidth="2" />
-        <path d="M 198 148 Q 210 162 222 148" fill="none" stroke="#b7e2f9" strokeWidth="2" />
+        <path
+          d="M 110 150 Q 132 148 158 156 L 158 178 Q 132 176 110 178 Z"
+          fill="#53a8da"
+          stroke="#2f7fae"
+          strokeWidth="2"
+        />
+        <path
+          d="M 310 150 Q 288 148 262 156 L 262 178 Q 288 176 310 178 Z"
+          fill="#53a8da"
+          stroke="#2f7fae"
+          strokeWidth="2"
+        />
+        <path
+          d="M 198 148 Q 210 162 222 148"
+          fill="none"
+          stroke="#b7e2f9"
+          strokeWidth="2"
+        />
       </g>
     ),
   },
   {
     id: "rekawiczki",
     label: "Rękawiczki",
+    bodyPart: "hands",
+    layer: 1,
     svgLayer: (
       <g key="rekawiczki">
         <path
@@ -155,70 +283,220 @@ export const clothingItems: ClothingItem[] = [
           stroke="#7d2a23"
           strokeWidth="2"
         />
-        <path d="M 40 150 Q 52 150 54 162 Q 52 172 42 172" fill="#bc4337" stroke="#7d2a23" strokeWidth="2" />
+        <path
+          d="M 40 150 Q 52 150 54 162 Q 52 172 42 172"
+          fill="#bc4337"
+          stroke="#7d2a23"
+          strokeWidth="2"
+        />
         <path
           d="M 406 150 Q 406 138 394 138 L 384 138 Q 374 138 374 148 L 374 176 Q 374 186 384 186 L 394 186 Q 406 186 406 174 Z"
           fill="#bc4337"
           stroke="#7d2a23"
           strokeWidth="2"
         />
-        <path d="M 380 150 Q 368 150 366 162 Q 368 172 378 172" fill="#bc4337" stroke="#7d2a23" strokeWidth="2" />
+        <path
+          d="M 380 150 Q 368 150 366 162 Q 368 172 378 172"
+          fill="#bc4337"
+          stroke="#7d2a23"
+          strokeWidth="2"
+        />
       </g>
     ),
   },
   {
     id: "spodnie",
     label: "Spodnie",
+    bodyPart: "legs",
+    layer: 1,
     svgLayer: (
       <g key="spodnie">
-        <path d="M 158 220 L 262 220 L 258 246 L 162 246 Z" fill="#33485b" stroke="#202f3b" strokeWidth="2" />
-        <path d="M 166 246 L 208 246 L 205 364 L 166 364 Z" fill="#33485b" stroke="#202f3b" strokeWidth="2" />
-        <path d="M 212 246 L 254 246 L 254 364 L 215 364 Z" fill="#33485b" stroke="#202f3b" strokeWidth="2" />
-        <line x1="210" y1="246" x2="210" y2="362" stroke="#4b657a" strokeWidth="2" />
-        <line x1="186" y1="250" x2="186" y2="360" stroke="#4b657a" strokeWidth="1.5" opacity="0.7" />
-        <line x1="234" y1="250" x2="234" y2="360" stroke="#4b657a" strokeWidth="1.5" opacity="0.7" />
+        <path
+          d="M 158 220 L 262 220 L 258 246 L 162 246 Z"
+          fill="#33485b"
+          stroke="#202f3b"
+          strokeWidth="2"
+        />
+        <path
+          d="M 166 246 L 208 246 L 205 364 L 166 364 Z"
+          fill="#33485b"
+          stroke="#202f3b"
+          strokeWidth="2"
+        />
+        <path
+          d="M 212 246 L 254 246 L 254 364 L 215 364 Z"
+          fill="#33485b"
+          stroke="#202f3b"
+          strokeWidth="2"
+        />
+        <line
+          x1="210"
+          y1="246"
+          x2="210"
+          y2="362"
+          stroke="#4b657a"
+          strokeWidth="2"
+        />
+        <line
+          x1="186"
+          y1="250"
+          x2="186"
+          y2="360"
+          stroke="#4b657a"
+          strokeWidth="1.5"
+          opacity="0.7"
+        />
+        <line
+          x1="234"
+          y1="250"
+          x2="234"
+          y2="360"
+          stroke="#4b657a"
+          strokeWidth="1.5"
+          opacity="0.7"
+        />
       </g>
     ),
   },
   {
     id: "spodenki",
     label: "Spodenki",
+    bodyPart: "legs",
+    layer: 1,
     svgLayer: (
       <g key="spodenki">
-        <path d="M 158 220 L 262 220 L 258 246 L 162 246 Z" fill="#cf6a24" stroke="#9b4c17" strokeWidth="2" />
-        <path d="M 166 246 L 208 246 L 206 298 L 166 298 Z" fill="#cf6a24" stroke="#9b4c17" strokeWidth="2" />
-        <path d="M 212 246 L 254 246 L 254 298 L 214 298 Z" fill="#cf6a24" stroke="#9b4c17" strokeWidth="2" />
-        <line x1="210" y1="246" x2="210" y2="296" stroke="#e08a4a" strokeWidth="2" />
+        <path
+          d="M 158 220 L 262 220 L 258 246 L 162 246 Z"
+          fill="#cf6a24"
+          stroke="#9b4c17"
+          strokeWidth="2"
+        />
+        <path
+          d="M 166 246 L 208 246 L 206 298 L 166 298 Z"
+          fill="#cf6a24"
+          stroke="#9b4c17"
+          strokeWidth="2"
+        />
+        <path
+          d="M 212 246 L 254 246 L 254 298 L 214 298 Z"
+          fill="#cf6a24"
+          stroke="#9b4c17"
+          strokeWidth="2"
+        />
+        <line
+          x1="210"
+          y1="246"
+          x2="210"
+          y2="296"
+          stroke="#e08a4a"
+          strokeWidth="2"
+        />
       </g>
     ),
   },
   {
     id: "buty",
     label: "Buty",
+    bodyPart: "feet",
+    layer: 2,
     svgLayer: (
       <g key="buty">
-        <path d="M 158 344 Q 160 334 170 334 L 204 334 Q 212 334 214 342 L 214 358 Q 212 364 202 364 L 164 364 Q 158 364 158 358 Z" fill="#6a4a3f" stroke="#3d2a24" strokeWidth="2" />
-        <path d="M 208 344 Q 210 334 220 334 L 254 334 Q 262 334 264 342 L 264 358 Q 262 364 252 364 L 214 364 Q 208 364 208 358 Z" fill="#6a4a3f" stroke="#3d2a24" strokeWidth="2" />
+        <path
+          d="M 158 344 Q 160 334 170 334 L 204 334 Q 212 334 214 342 L 214 358 Q 212 364 202 364 L 164 364 Q 158 364 158 358 Z"
+          fill="#6a4a3f"
+          stroke="#3d2a24"
+          strokeWidth="2"
+        />
+        <path
+          d="M 208 344 Q 210 334 220 334 L 254 334 Q 262 334 264 342 L 264 358 Q 262 364 252 364 L 214 364 Q 208 364 208 358 Z"
+          fill="#6a4a3f"
+          stroke="#3d2a24"
+          strokeWidth="2"
+        />
         <rect x="158" y="357" width="56" height="7" rx="3" fill="#251a16" />
         <rect x="208" y="357" width="56" height="7" rx="3" fill="#251a16" />
-        <line x1="172" y1="346" x2="198" y2="346" stroke="#8a6657" strokeWidth="1.5" />
-        <line x1="222" y1="346" x2="248" y2="346" stroke="#8a6657" strokeWidth="1.5" />
+        <line
+          x1="172"
+          y1="346"
+          x2="198"
+          y2="346"
+          stroke="#8a6657"
+          strokeWidth="1.5"
+        />
+        <line
+          x1="222"
+          y1="346"
+          x2="248"
+          y2="346"
+          stroke="#8a6657"
+          strokeWidth="1.5"
+        />
       </g>
     ),
   },
   {
     id: "skarpetki",
     label: "Skarpetki",
+    bodyPart: "feet",
+    layer: 1,
     svgLayer: (
       <g key="skarpetki">
-        <path d="M 168 324 L 184 324 L 184 340 Q 184 344 180 344 L 170 344 Q 166 344 166 340 L 166 330 Q 166 324 168 324 Z" fill="#f2f2f2" stroke="#cfcfcf" strokeWidth="1.5" />
-        <path d="M 192 324 L 208 324 L 208 340 Q 208 344 204 344 L 194 344 Q 190 344 190 340 L 190 330 Q 190 324 192 324 Z" fill="#f2f2f2" stroke="#cfcfcf" strokeWidth="1.5" />
-        <path d="M 220 324 L 236 324 L 236 340 Q 236 344 232 344 L 222 344 Q 218 344 218 340 L 218 330 Q 218 324 220 324 Z" fill="#f2f2f2" stroke="#cfcfcf" strokeWidth="1.5" />
-        <path d="M 244 324 L 260 324 L 260 340 Q 260 344 256 344 L 246 344 Q 242 344 242 340 L 242 330 Q 242 324 244 324 Z" fill="#f2f2f2" stroke="#cfcfcf" strokeWidth="1.5" />
-        <line x1="168" y1="330" x2="184" y2="330" stroke="#dfdfdf" strokeWidth="1.5" />
-        <line x1="192" y1="330" x2="208" y2="330" stroke="#dfdfdf" strokeWidth="1.5" />
-        <line x1="220" y1="330" x2="236" y2="330" stroke="#dfdfdf" strokeWidth="1.5" />
-        <line x1="244" y1="330" x2="260" y2="330" stroke="#dfdfdf" strokeWidth="1.5" />
+        <path
+          d="M 168 324 L 184 324 L 184 340 Q 184 344 180 344 L 170 344 Q 166 344 166 340 L 166 330 Q 166 324 168 324 Z"
+          fill="#f2f2f2"
+          stroke="#cfcfcf"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M 192 324 L 208 324 L 208 340 Q 208 344 204 344 L 194 344 Q 190 344 190 340 L 190 330 Q 190 324 192 324 Z"
+          fill="#f2f2f2"
+          stroke="#cfcfcf"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M 220 324 L 236 324 L 236 340 Q 236 344 232 344 L 222 344 Q 218 344 218 340 L 218 330 Q 218 324 220 324 Z"
+          fill="#f2f2f2"
+          stroke="#cfcfcf"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M 244 324 L 260 324 L 260 340 Q 260 344 256 344 L 246 344 Q 242 344 242 340 L 242 330 Q 242 324 244 324 Z"
+          fill="#f2f2f2"
+          stroke="#cfcfcf"
+          strokeWidth="1.5"
+        />
+        <line
+          x1="168"
+          y1="330"
+          x2="184"
+          y2="330"
+          stroke="#dfdfdf"
+          strokeWidth="1.5"
+        />
+        <line
+          x1="192"
+          y1="330"
+          x2="208"
+          y2="330"
+          stroke="#dfdfdf"
+          strokeWidth="1.5"
+        />
+        <line
+          x1="220"
+          y1="330"
+          x2="236"
+          y2="330"
+          stroke="#dfdfdf"
+          strokeWidth="1.5"
+        />
+        <line
+          x1="244"
+          y1="330"
+          x2="260"
+          y2="330"
+          stroke="#dfdfdf"
+          strokeWidth="1.5"
+        />
       </g>
     ),
   },
@@ -233,6 +511,8 @@ export const presets: Preset[] = [
       "czapka-zimowa",
       "szalik",
       "kurtka",
+      "koszulka",
+      "bluza",
       "spodnie",
       "skarpetki",
       "buty",
@@ -249,12 +529,19 @@ export const presets: Preset[] = [
     id: "jesien",
     label: "Jesień",
     emoji: "🍂",
-    itemIds: ["bluza", "spodnie", "skarpetki", "buty"],
+    itemIds: [
+      "czapka-jesienna",
+      "koszulka",
+      "bluza",
+      "spodnie",
+      "skarpetki",
+      "buty",
+    ],
   },
   {
     id: "pusto",
     label: "Pusto",
     emoji: "🫥",
-    itemIds: ["skarpetki"],
+    itemIds: [],
   },
 ];

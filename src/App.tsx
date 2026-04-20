@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { clothingItems, presets, type Preset } from "./clothes";
+import { BODY_PARTS, buildGameQueue } from "./buildGameQueue";
 
 type GameState =
   | { phase: "setup" }
@@ -15,65 +16,6 @@ type GameState =
   | { phase: "done" };
 
 type MobileTab = "preview" | "sidebar";
-
-type QueueRule = {
-  itemId: string;
-  after: string[];
-};
-
-const queueRules: QueueRule[] = [
-  { itemId: "buty", after: ["skarpetki"] },
-  { itemId: "kurtka", after: ["bluza", "koszulka"] },
-];
-
-function buildGameQueue(selectedIds: string[]) {
-  const uniqueSelectedIds = Array.from(new Set(selectedIds));
-  const selectedSet = new Set(uniqueSelectedIds);
-  const indegree = new Map<string, number>();
-  const graph = new Map<string, string[]>();
-
-  for (const id of uniqueSelectedIds) {
-    indegree.set(id, 0);
-    graph.set(id, []);
-  }
-
-  for (const rule of queueRules) {
-    if (!selectedSet.has(rule.itemId)) continue;
-
-    for (const dependencyId of rule.after) {
-      if (!selectedSet.has(dependencyId)) continue;
-
-      graph.get(dependencyId)?.push(rule.itemId);
-      indegree.set(rule.itemId, (indegree.get(rule.itemId) ?? 0) + 1);
-    }
-  }
-
-  const available = uniqueSelectedIds.filter((id) => (indegree.get(id) ?? 0) === 0);
-  const queue: string[] = [];
-
-  while (available.length > 0) {
-    const randomIndex = Math.floor(Math.random() * available.length);
-    const [nextId] = available.splice(randomIndex, 1);
-
-    if (!nextId) break;
-
-    queue.push(nextId);
-
-    for (const dependentId of graph.get(nextId) ?? []) {
-      const nextDegree = (indegree.get(dependentId) ?? 0) - 1;
-      indegree.set(dependentId, nextDegree);
-
-      if (nextDegree === 0) {
-        available.push(dependentId);
-      }
-    }
-  }
-
-  // Fallback preserves gameplay even if future rules create a cycle.
-  if (queue.length !== uniqueSelectedIds.length) return uniqueSelectedIds;
-
-  return queue;
-}
 
 function App() {
   const [activePreset, setActivePreset] = useState<Preset>(presets[0]);
@@ -418,9 +360,22 @@ function App() {
         >
           {renderLudzikOutline()}
 
-          {/* Clothing layers — rendered above the outline */}
+          {/* Clothing layers — head is drawn just before hands; lower layer stays closer to skin within each group. */}
           {clothingItems
             .filter((item) => checked.has(item.id))
+            .sort((a, b) => {
+              const renderPriority = (bodyPart: string) => {
+                if (bodyPart === "hands") return 2;
+                if (bodyPart === "head") return 1;
+                return 0;
+              };
+
+              const priorityDiff =
+                renderPriority(a.bodyPart) - renderPriority(b.bodyPart);
+              if (priorityDiff !== 0) return priorityDiff;
+
+              return a.layer - b.layer;
+            })
             .map((item) => item.svgLayer)}
         </svg>
 
@@ -442,42 +397,75 @@ function App() {
         >
           <h2>Ubierz mnie!</h2>
 
-          <div className="presets">
-            {presets.map((preset) => (
-              <button
-                key={preset.id}
-                className={`preset-btn${activePreset.id === preset.id ? " active" : ""}`}
-                onClick={() => handlePreset(preset)}
-              >
-                {preset.emoji} {preset.label}
-              </button>
-            ))}
+          <div className="sidebar-scroll">
+            <div className="presets">
+              {presets.map((preset) => (
+                <button
+                  key={preset.id}
+                  className={`preset-btn${activePreset.id === preset.id ? " active" : ""}`}
+                  onClick={() => handlePreset(preset)}
+                >
+                  {preset.emoji} {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="sidebar-hint">Wybierz ubrania:</p>
+
+            <ul className="clothes-list">
+              {BODY_PARTS.map(({ id: partId, label: partLabel }) => {
+                const partItems = clothingItems
+                  .filter((item) => item.bodyPart === partId)
+                  .sort((a, b) => a.layer - b.layer);
+                if (partItems.length === 0) return null;
+                return (
+                  <li key={partId} className="clothes-group">
+                    <span className="clothes-group-label">{partLabel}</span>
+                    <ul className="clothes-group-list">
+                      {partItems.map((item) => {
+                        const isItemDisabled =
+                          !checked.has(item.id) &&
+                          clothingItems.some(
+                            (other) =>
+                              other.id !== item.id &&
+                              other.bodyPart === item.bodyPart &&
+                              other.layer === item.layer &&
+                              checked.has(other.id),
+                          );
+                        return (
+                          <li key={item.id}>
+                            <label
+                              className={`clothes-item${
+                                isItemDisabled ? " is-disabled" : ""
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked.has(item.id)}
+                                onChange={() => toggleItem(item.id)}
+                                disabled={isItemDisabled}
+                              />
+                              {item.label}
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
-          <p className="sidebar-hint">Wybierz ubrania:</p>
-
-          <ul className="clothes-list">
-            {clothingItems.map((item) => (
-              <li key={item.id}>
-                <label className="clothes-item">
-                  <input
-                    type="checkbox"
-                    checked={checked.has(item.id)}
-                    onChange={() => toggleItem(item.id)}
-                  />
-                  {item.label}
-                </label>
-              </li>
-            ))}
-          </ul>
-
-          <button
-            className="start-btn"
-            onClick={startGame}
-            disabled={checked.size === 0}
-          >
-            ▶ Zacznij ubieranie
-          </button>
+          <div className="sidebar-footer">
+            <button
+              className="start-btn"
+              onClick={startGame}
+              disabled={checked.size === 0}
+            >
+              ▶ Zacznij ubieranie
+            </button>
+          </div>
         </aside>
       )}
     </div>
