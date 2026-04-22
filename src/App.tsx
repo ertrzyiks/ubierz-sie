@@ -10,13 +10,6 @@ import {
 
 type GameState =
   | { phase: "setup" }
-  | {
-      phase: "shuffling";
-      queue: string[];
-      step: number;
-      frames: string[];
-      index: number;
-    }
   | { phase: "playing"; queue: string[]; step: number }
   | { phase: "done" };
 
@@ -37,35 +30,6 @@ function App() {
   const [checked, setChecked] = useState<Set<string>>(initialState.checked);
   const [game, setGame] = useState<GameState>(initialState.game);
   const [mobileTab, setMobileTab] = useState<MobileTab>(initialState.mobileTab);
-
-  function createShuffleFrames(targetId: string) {
-    const availableIds = clothingItems.map((item) => item.id);
-    const randomFrames = Array.from({ length: 16 }, (_, index) => {
-      const randomId =
-        availableIds[Math.floor(Math.random() * availableIds.length)] ??
-        targetId;
-
-      if (index > 11 && Math.random() > 0.5) {
-        return targetId;
-      }
-
-      return randomId;
-    });
-
-    return [...randomFrames, targetId, targetId];
-  }
-
-  function startShuffle(queue: string[], step: number) {
-    const targetId = queue[step];
-
-    setGame({
-      phase: "shuffling",
-      queue,
-      step,
-      frames: createShuffleFrames(targetId),
-      index: 0,
-    });
-  }
 
   function renderLudzikOutline() {
     return (
@@ -186,7 +150,7 @@ function App() {
     if (queue.length === 0) return;
 
     setChecked(new Set());
-    startShuffle(queue, 0);
+    setGame({ phase: "playing", queue, step: 0 });
   }
 
   function confirmItem() {
@@ -199,7 +163,7 @@ function App() {
     if (nextStep >= queue.length) {
       setGame({ phase: "done" });
     } else {
-      startShuffle(queue, nextStep);
+      setGame({ phase: "playing", queue, step: nextStep });
     }
   }
 
@@ -217,57 +181,22 @@ function App() {
     persistAppState(snapshot);
   }, [activePreset.id, checked, game, mobileTab]);
 
-  useEffect(() => {
-    if (game.phase !== "shuffling") return;
-
-    const isLastFrame = game.index >= game.frames.length - 1;
-    const delay = isLastFrame ? 360 : game.index < 10 ? 90 : 140;
-
-    const timeoutId = window.setTimeout(() => {
-      if (isLastFrame) {
-        setGame({ phase: "playing", queue: game.queue, step: game.step });
-        return;
-      }
-
-      setGame((current) => {
-        if (current.phase !== "shuffling") return current;
-
-        return {
-          ...current,
-          index: current.index + 1,
-        };
-      });
-    }, delay);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [game]);
-
-  const currentItemId =
-    game.phase === "playing"
-      ? game.queue[game.step]
-      : game.phase === "shuffling"
-        ? game.frames[game.index]
-        : null;
+  const currentItemId = game.phase === "playing" ? game.queue[game.step] : null;
   const currentItem = currentItemId
     ? (clothingItems.find((item) => item.id === currentItemId) ?? null)
     : null;
-  const progressValue =
-    game.phase === "playing" || game.phase === "shuffling" ? game.step + 1 : 0;
-  const progressTotal =
-    game.phase === "playing" || game.phase === "shuffling"
-      ? game.queue.length
-      : 0;
+  const progressValue = game.phase === "playing" ? game.step + 1 : 0;
+  const progressTotal = game.phase === "playing" ? game.queue.length : 0;
   const progressRadius = 24;
   const progressCircumference = 2 * Math.PI * progressRadius;
   const progressOffset =
-    (game.phase === "playing" || game.phase === "shuffling") &&
-    progressTotal > 0
+    game.phase === "playing" && progressTotal > 0
       ? progressCircumference * (1 - progressValue / progressTotal)
       : progressCircumference;
 
   return (
     <div className="app">
-      {(game.phase === "playing" || game.phase === "shuffling") && (
+      {game.phase === "playing" && (
         <div className="game-progress-ring" aria-label="Postęp ubierania">
           <svg
             className="game-progress-svg"
@@ -316,48 +245,30 @@ function App() {
       <div
         className={`figure-area${game.phase !== "setup" ? " figure-area-game" : ""}${game.phase === "setup" && mobileTab !== "preview" ? " mobile-hidden" : ""}`}
       >
-        {(game.phase === "playing" || game.phase === "shuffling") &&
-          currentItem && (
-            <div className="game-stage-panel">
-              <div className="game-panel">
-                <p className="game-prompt">
-                  {game.phase === "shuffling"
-                    ? "Losowanie ubrania..."
-                    : "Załóż teraz:"}
-                </p>
-                <div
-                  className={`cloth-preview-frame${game.phase === "shuffling" ? " is-shuffling" : ""}`}
+        {game.phase === "playing" && currentItem && (
+          <div className="game-stage-panel">
+            <div className="game-panel">
+              <p className="game-prompt">Załóż teraz:</p>
+              <div className="cloth-preview-frame">
+                <svg
+                  key={currentItem.id}
+                  className="cloth-preview"
+                  viewBox="0 0 420 390"
+                  xmlns="http://www.w3.org/2000/svg"
+                  role="img"
+                  aria-label={`Podgląd ubrania: ${currentItem.label}`}
                 >
-                  <svg
-                    key={
-                      game.phase === "shuffling"
-                        ? `${currentItem.id}-${game.index}`
-                        : currentItem.id
-                    }
-                    className={`cloth-preview${game.phase === "shuffling" ? " is-flying" : ""}`}
-                    viewBox="0 0 420 390"
-                    xmlns="http://www.w3.org/2000/svg"
-                    role="img"
-                    aria-label={`Podgląd ubrania: ${currentItem.label}`}
-                  >
-                    {currentItem.svgLayer}
-                  </svg>
-                </div>
-                <p className="game-item-name">
-                  <span
-                    key={
-                      game.phase === "shuffling"
-                        ? `${currentItem.id}-label-${game.index}`
-                        : currentItem.id
-                    }
-                    className="game-item-name-text"
-                  >
-                    {currentItem.label}
-                  </span>
-                </p>
+                  {currentItem.svgLayer}
+                </svg>
               </div>
+              <p className="game-item-name">
+                <span key={currentItem.id} className="game-item-name-text">
+                  {currentItem.label}
+                </span>
+              </p>
             </div>
-          )}
+          </div>
+        )}
 
         {game.phase === "done" && (
           <div className="game-stage-panel">
