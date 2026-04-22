@@ -1,4 +1,13 @@
-import { useEffect, useState } from "react";
+import {
+  Children,
+  isValidElement,
+  type ReactNode,
+  type SVGProps,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { interpolate } from "flubber";
 import "./App.css";
 import { clothingItems, presets, type Preset } from "./clothes";
 import { BODY_PARTS, buildGameQueue } from "./buildGameQueue";
@@ -22,6 +31,51 @@ interface InitialAppState {
   mobileTab: MobileTab;
 }
 
+interface PreviewMorphTransition {
+  fromId: string;
+  toId: string;
+  key: number;
+}
+
+interface SvgPathDescriptor {
+  d: string;
+  props: Omit<SVGProps<SVGPathElement>, "d" | "children">;
+}
+
+const PREVIEW_MORPH_DURATION_MS = 760;
+
+function collectSvgPathDescriptors(node: ReactNode): SvgPathDescriptor[] {
+  const descriptors: SvgPathDescriptor[] = [];
+
+  function walk(current: ReactNode) {
+    if (!isValidElement(current)) return;
+
+    const element = current as {
+      type: unknown;
+      props: SVGProps<SVGPathElement> & { children?: ReactNode };
+    };
+
+    if (element.type === "path") {
+      const { d, children: _children, ...rest } = element.props;
+      if (typeof d === "string") {
+        descriptors.push({ d, props: rest });
+      }
+    }
+
+    Children.forEach(element.props.children, walk);
+  }
+
+  walk(node);
+  return descriptors;
+}
+
+const itemPathMap = new Map(
+  clothingItems.map((item) => [
+    item.id,
+    collectSvgPathDescriptors(item.svgLayer),
+  ]),
+);
+
 function App() {
   const [initialState] = useState<InitialAppState>(() => getInitialAppState());
   const [activePreset, setActivePreset] = useState<Preset>(
@@ -30,6 +84,12 @@ function App() {
   const [checked, setChecked] = useState<Set<string>>(initialState.checked);
   const [game, setGame] = useState<GameState>(initialState.game);
   const [mobileTab, setMobileTab] = useState<MobileTab>(initialState.mobileTab);
+  const [previewMorph, setPreviewMorph] =
+    useState<PreviewMorphTransition | null>(null);
+  const [morphPathDs, setMorphPathDs] = useState<string[] | null>(null);
+  const previousPreviewItemIdRef = useRef<string | null>(null);
+  const morphTimeoutIdRef = useRef<number | null>(null);
+  const morphRafIdRef = useRef<number | null>(null);
 
   function renderLudzikOutline() {
     return (
@@ -194,6 +254,116 @@ function App() {
       ? progressCircumference * (1 - progressValue / progressTotal)
       : progressCircumference;
 
+  useEffect(() => {
+    if (morphTimeoutIdRef.current !== null) {
+      window.clearTimeout(morphTimeoutIdRef.current);
+      morphTimeoutIdRef.current = null;
+    }
+
+    if (game.phase !== "playing" || !currentItemId) {
+      setPreviewMorph(null);
+      previousPreviewItemIdRef.current = null;
+      return;
+    }
+
+    const previousId = previousPreviewItemIdRef.current;
+    if (previousId && previousId !== currentItemId) {
+      const nextMorph: PreviewMorphTransition = {
+        fromId: previousId,
+        toId: currentItemId,
+        key: Date.now(),
+      };
+      setPreviewMorph(nextMorph);
+      morphTimeoutIdRef.current = window.setTimeout(() => {
+        setPreviewMorph((current) =>
+          current && current.key === nextMorph.key ? null : current,
+        );
+      }, PREVIEW_MORPH_DURATION_MS);
+    } else {
+      setPreviewMorph(null);
+    }
+
+    previousPreviewItemIdRef.current = currentItemId;
+  }, [currentItemId, game.phase]);
+
+  useEffect(() => {
+    return () => {
+      if (morphTimeoutIdRef.current !== null) {
+        window.clearTimeout(morphTimeoutIdRef.current);
+      }
+      if (morphRafIdRef.current !== null) {
+        window.cancelAnimationFrame(morphRafIdRef.current);
+      }
+    };
+  }, []);
+
+  const activePreviewMorph =
+    previewMorph &&
+    currentItem &&
+    previewMorph.toId === currentItem.id &&
+    previewMorph.fromId !== previewMorph.toId
+      ? previewMorph
+      : null;
+  const morphFromItem = activePreviewMorph
+    ? (clothingItems.find((item) => item.id === activePreviewMorph.fromId) ??
+      null)
+    : null;
+  const isPreviewMorphing = Boolean(activePreviewMorph && morphFromItem);
+  const morphFromPaths = activePreviewMorph
+    ? (itemPathMap.get(activePreviewMorph.fromId) ?? [])
+    : [];
+  const morphToPaths = activePreviewMorph
+    ? (itemPathMap.get(activePreviewMorph.toId) ?? [])
+    : [];
+  const canPathMorph =
+    isPreviewMorphing && morphFromPaths.length > 0 && morphToPaths.length > 0;
+  const shouldRenderPathMorph =
+    canPathMorph && Boolean(activePreviewMorph) && Boolean(morphPathDs);
+
+  useEffect(() => {
+    if (morphRafIdRef.current !== null) {
+      window.cancelAnimationFrame(morphRafIdRef.current);
+      morphRafIdRef.current = null;
+    }
+
+    if (!canPathMorph || !activePreviewMorph) {
+      setMorphPathDs(null);
+      return;
+    }
+
+    const interpolators = morphToPaths.map((targetPath, index) =>
+      interpolate(
+        morphFromPaths[index % morphFromPaths.length].d,
+        targetPath.d,
+        {
+          maxSegmentLength: 2,
+        },
+      ),
+    );
+
+    const startedAt = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - startedAt;
+      const progress = Math.min(1, elapsed / PREVIEW_MORPH_DURATION_MS);
+      setMorphPathDs(interpolators.map((morph) => morph(progress)));
+
+      if (progress < 1) {
+        morphRafIdRef.current = window.requestAnimationFrame(animate);
+      } else {
+        morphRafIdRef.current = null;
+      }
+    };
+
+    morphRafIdRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (morphRafIdRef.current !== null) {
+        window.cancelAnimationFrame(morphRafIdRef.current);
+        morphRafIdRef.current = null;
+      }
+    };
+  }, [activePreviewMorph?.key, canPathMorph]);
+
   return (
     <div className="app">
       {game.phase === "playing" && (
@@ -249,16 +419,31 @@ function App() {
           <div className="game-stage-panel">
             <div className="game-panel">
               <p className="game-prompt">Załóż teraz:</p>
-              <div className="cloth-preview-frame">
+              <div
+                className={`cloth-preview-frame${isPreviewMorphing ? " is-morphing" : ""}`}
+              >
                 <svg
-                  key={currentItem.id}
                   className="cloth-preview"
                   viewBox="0 0 420 390"
                   xmlns="http://www.w3.org/2000/svg"
                   role="img"
                   aria-label={`Podgląd ubrania: ${currentItem.label}`}
                 >
-                  {currentItem.svgLayer}
+                  {shouldRenderPathMorph &&
+                  activePreviewMorph &&
+                  morphPathDs ? (
+                    <g key={`morph-${activePreviewMorph.key}`}>
+                      {morphToPaths.map((targetPath, index) => (
+                        <path
+                          key={`morph-path-${activePreviewMorph.key}-${index}`}
+                          {...targetPath.props}
+                          d={morphPathDs[index] ?? targetPath.d}
+                        />
+                      ))}
+                    </g>
+                  ) : (
+                    <g key={currentItem.id}>{currentItem.svgLayer}</g>
+                  )}
                 </svg>
               </div>
               <p className="game-item-name">

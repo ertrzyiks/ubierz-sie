@@ -289,11 +289,15 @@
   overflow: hidden;
   display: grid;
   place-items: center;
+  position: relative;
 }
 
-.cloth-preview-frame.is-shuffling {
-  width: min(260px, 100%);
-  background: color-mix(in srgb, var(--accent-bg) 40%, var(--bg) 60%);
+.cloth-preview-frame.is-morphing {
+  background: color-mix(in srgb, var(--accent-bg) 58%, var(--bg) 42%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent 60%),
+    0 0 24px color-mix(in srgb, var(--accent) 28%, transparent 72%);
+  animation: morph-frame-pulse 0.76s ease-out;
 }
 
 .cloth-preview {
@@ -302,10 +306,8 @@
   height: auto;
 }
 
-.cloth-preview.is-flying {
-  width: 120px;
-  animation: fly-preview 0.24s linear;
-  transform-origin: center;
+.cloth-preview-frame.is-morphing .cloth-preview {
+  filter: saturate(1.28) contrast(1.08);
 }
 
 .game-item-name {
@@ -377,23 +379,17 @@
   opacity: 0.7;
 }
 
-@keyframes fly-preview {
+@keyframes morph-frame-pulse {
   0% {
-    opacity: 0;
-    transform: translateX(-150px) scale(0.8) rotate(-10deg);
+    transform: scale(0.94);
   }
 
-  20% {
-    opacity: 1;
-  }
-
-  80% {
-    opacity: 1;
+  55% {
+    transform: scale(1.06);
   }
 
   100% {
-    opacity: 0;
-    transform: translateX(150px) scale(1.05) rotate(10deg);
+    transform: scale(1);
   }
 }
 
