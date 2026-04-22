@@ -539,6 +539,12 @@ export const presets: Preset[] = [
     ],
   },
   {
+    id: "dom",
+    label: "Dom",
+    emoji: "🏠",
+    itemIds: ["skarpetki", "spodnie", "koszulka"],
+  },
+  {
     id: "pusto",
     label: "Pusto",
     emoji: "🫥",

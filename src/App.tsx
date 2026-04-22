@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import { clothingItems, presets, type Preset } from "./clothes";
 import { BODY_PARTS, buildGameQueue } from "./buildGameQueue";
+import {
+  getInitialAppState,
+  persistAppState,
+  type AppStateSnapshot,
+} from "./appPersistence";
 
 type GameState =
   | { phase: "setup" }
@@ -17,13 +22,21 @@ type GameState =
 
 type MobileTab = "preview" | "sidebar";
 
+interface InitialAppState {
+  activePreset: Preset;
+  checked: Set<string>;
+  game: GameState;
+  mobileTab: MobileTab;
+}
+
 function App() {
-  const [activePreset, setActivePreset] = useState<Preset>(presets[0]);
-  const [checked, setChecked] = useState<Set<string>>(
-    new Set(presets[0].itemIds),
+  const [initialState] = useState<InitialAppState>(() => getInitialAppState());
+  const [activePreset, setActivePreset] = useState<Preset>(
+    initialState.activePreset,
   );
-  const [game, setGame] = useState<GameState>({ phase: "setup" });
-  const [mobileTab, setMobileTab] = useState<MobileTab>("preview");
+  const [checked, setChecked] = useState<Set<string>>(initialState.checked);
+  const [game, setGame] = useState<GameState>(initialState.game);
+  const [mobileTab, setMobileTab] = useState<MobileTab>(initialState.mobileTab);
 
   function createShuffleFrames(targetId: string) {
     const availableIds = clothingItems.map((item) => item.id);
@@ -193,6 +206,16 @@ function App() {
   function exitGame() {
     setGame({ phase: "setup" });
   }
+
+  useEffect(() => {
+    const snapshot: AppStateSnapshot = {
+      activePreset,
+      checked,
+      game,
+      mobileTab,
+    };
+    persistAppState(snapshot);
+  }, [activePreset.id, checked, game, mobileTab]);
 
   useEffect(() => {
     if (game.phase !== "shuffling") return;
