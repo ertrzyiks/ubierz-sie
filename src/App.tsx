@@ -1,4 +1,13 @@
-import { useEffect, useState } from "react";
+import {
+  Children,
+  isValidElement,
+  type ReactNode,
+  type SVGProps,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { interpolate } from "flubber";
 import "./App.css";
 import { clothingItems, presets, type Preset } from "./clothes";
 import { BODY_PARTS, buildGameQueue } from "./buildGameQueue";
@@ -10,13 +19,6 @@ import {
 
 type GameState =
   | { phase: "setup" }
-  | {
-      phase: "shuffling";
-      queue: string[];
-      step: number;
-      frames: string[];
-      index: number;
-    }
   | { phase: "playing"; queue: string[]; step: number }
   | { phase: "done" };
 
@@ -29,6 +31,51 @@ interface InitialAppState {
   mobileTab: MobileTab;
 }
 
+interface PreviewMorphTransition {
+  fromId: string;
+  toId: string;
+  key: number;
+}
+
+interface SvgPathDescriptor {
+  d: string;
+  props: Omit<SVGProps<SVGPathElement>, "d" | "children">;
+}
+
+const PREVIEW_MORPH_DURATION_MS = 760;
+
+function collectSvgPathDescriptors(node: ReactNode): SvgPathDescriptor[] {
+  const descriptors: SvgPathDescriptor[] = [];
+
+  function walk(current: ReactNode) {
+    if (!isValidElement(current)) return;
+
+    const element = current as {
+      type: unknown;
+      props: SVGProps<SVGPathElement> & { children?: ReactNode };
+    };
+
+    if (element.type === "path") {
+      const { d, children: _children, ...rest } = element.props;
+      if (typeof d === "string") {
+        descriptors.push({ d, props: rest });
+      }
+    }
+
+    Children.forEach(element.props.children, walk);
+  }
+
+  walk(node);
+  return descriptors;
+}
+
+const itemPathMap = new Map(
+  clothingItems.map((item) => [
+    item.id,
+    collectSvgPathDescriptors(item.svgLayer),
+  ]),
+);
+
 function App() {
   const [initialState] = useState<InitialAppState>(() => getInitialAppState());
   const [activePreset, setActivePreset] = useState<Preset>(
@@ -37,35 +84,12 @@ function App() {
   const [checked, setChecked] = useState<Set<string>>(initialState.checked);
   const [game, setGame] = useState<GameState>(initialState.game);
   const [mobileTab, setMobileTab] = useState<MobileTab>(initialState.mobileTab);
-
-  function createShuffleFrames(targetId: string) {
-    const availableIds = clothingItems.map((item) => item.id);
-    const randomFrames = Array.from({ length: 16 }, (_, index) => {
-      const randomId =
-        availableIds[Math.floor(Math.random() * availableIds.length)] ??
-        targetId;
-
-      if (index > 11 && Math.random() > 0.5) {
-        return targetId;
-      }
-
-      return randomId;
-    });
-
-    return [...randomFrames, targetId, targetId];
-  }
-
-  function startShuffle(queue: string[], step: number) {
-    const targetId = queue[step];
-
-    setGame({
-      phase: "shuffling",
-      queue,
-      step,
-      frames: createShuffleFrames(targetId),
-      index: 0,
-    });
-  }
+  const [previewMorph, setPreviewMorph] =
+    useState<PreviewMorphTransition | null>(null);
+  const [morphPathDs, setMorphPathDs] = useState<string[] | null>(null);
+  const previousPreviewItemIdRef = useRef<string | null>(null);
+  const morphTimeoutIdRef = useRef<number | null>(null);
+  const morphRafIdRef = useRef<number | null>(null);
 
   function renderLudzikOutline() {
     return (
@@ -186,7 +210,7 @@ function App() {
     if (queue.length === 0) return;
 
     setChecked(new Set());
-    startShuffle(queue, 0);
+    setGame({ phase: "playing", queue, step: 0 });
   }
 
   function confirmItem() {
@@ -199,7 +223,7 @@ function App() {
     if (nextStep >= queue.length) {
       setGame({ phase: "done" });
     } else {
-      startShuffle(queue, nextStep);
+      setGame({ phase: "playing", queue, step: nextStep });
     }
   }
 
@@ -217,57 +241,132 @@ function App() {
     persistAppState(snapshot);
   }, [activePreset.id, checked, game, mobileTab]);
 
-  useEffect(() => {
-    if (game.phase !== "shuffling") return;
-
-    const isLastFrame = game.index >= game.frames.length - 1;
-    const delay = isLastFrame ? 360 : game.index < 10 ? 90 : 140;
-
-    const timeoutId = window.setTimeout(() => {
-      if (isLastFrame) {
-        setGame({ phase: "playing", queue: game.queue, step: game.step });
-        return;
-      }
-
-      setGame((current) => {
-        if (current.phase !== "shuffling") return current;
-
-        return {
-          ...current,
-          index: current.index + 1,
-        };
-      });
-    }, delay);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [game]);
-
-  const currentItemId =
-    game.phase === "playing"
-      ? game.queue[game.step]
-      : game.phase === "shuffling"
-        ? game.frames[game.index]
-        : null;
+  const currentItemId = game.phase === "playing" ? game.queue[game.step] : null;
   const currentItem = currentItemId
     ? (clothingItems.find((item) => item.id === currentItemId) ?? null)
     : null;
-  const progressValue =
-    game.phase === "playing" || game.phase === "shuffling" ? game.step + 1 : 0;
-  const progressTotal =
-    game.phase === "playing" || game.phase === "shuffling"
-      ? game.queue.length
-      : 0;
+  const progressValue = game.phase === "playing" ? game.step + 1 : 0;
+  const progressTotal = game.phase === "playing" ? game.queue.length : 0;
   const progressRadius = 24;
   const progressCircumference = 2 * Math.PI * progressRadius;
   const progressOffset =
-    (game.phase === "playing" || game.phase === "shuffling") &&
-    progressTotal > 0
+    game.phase === "playing" && progressTotal > 0
       ? progressCircumference * (1 - progressValue / progressTotal)
       : progressCircumference;
 
+  useEffect(() => {
+    if (morphTimeoutIdRef.current !== null) {
+      window.clearTimeout(morphTimeoutIdRef.current);
+      morphTimeoutIdRef.current = null;
+    }
+
+    if (game.phase !== "playing" || !currentItemId) {
+      setPreviewMorph(null);
+      previousPreviewItemIdRef.current = null;
+      return;
+    }
+
+    const previousId = previousPreviewItemIdRef.current;
+    if (previousId && previousId !== currentItemId) {
+      const nextMorph: PreviewMorphTransition = {
+        fromId: previousId,
+        toId: currentItemId,
+        key: Date.now(),
+      };
+      setPreviewMorph(nextMorph);
+      morphTimeoutIdRef.current = window.setTimeout(() => {
+        setPreviewMorph((current) =>
+          current && current.key === nextMorph.key ? null : current,
+        );
+      }, PREVIEW_MORPH_DURATION_MS);
+    } else {
+      setPreviewMorph(null);
+    }
+
+    previousPreviewItemIdRef.current = currentItemId;
+  }, [currentItemId, game.phase]);
+
+  useEffect(() => {
+    return () => {
+      if (morphTimeoutIdRef.current !== null) {
+        window.clearTimeout(morphTimeoutIdRef.current);
+      }
+      if (morphRafIdRef.current !== null) {
+        window.cancelAnimationFrame(morphRafIdRef.current);
+      }
+    };
+  }, []);
+
+  const activePreviewMorph =
+    previewMorph &&
+    currentItem &&
+    previewMorph.toId === currentItem.id &&
+    previewMorph.fromId !== previewMorph.toId
+      ? previewMorph
+      : null;
+  const morphFromItem = activePreviewMorph
+    ? (clothingItems.find((item) => item.id === activePreviewMorph.fromId) ??
+      null)
+    : null;
+  const isPreviewMorphing = Boolean(activePreviewMorph && morphFromItem);
+  const morphFromPaths = activePreviewMorph
+    ? (itemPathMap.get(activePreviewMorph.fromId) ?? [])
+    : [];
+  const morphToPaths = activePreviewMorph
+    ? (itemPathMap.get(activePreviewMorph.toId) ?? [])
+    : [];
+  const canPathMorph =
+    isPreviewMorphing && morphFromPaths.length > 0 && morphToPaths.length > 0;
+  const shouldRenderPathMorph =
+    canPathMorph && Boolean(activePreviewMorph) && Boolean(morphPathDs);
+
+  useEffect(() => {
+    if (morphRafIdRef.current !== null) {
+      window.cancelAnimationFrame(morphRafIdRef.current);
+      morphRafIdRef.current = null;
+    }
+
+    if (!canPathMorph || !activePreviewMorph) {
+      setMorphPathDs(null);
+      return;
+    }
+
+    const interpolators = morphToPaths.map((targetPath, index) =>
+      interpolate(
+        morphFromPaths[index % morphFromPaths.length].d,
+        targetPath.d,
+        {
+          maxSegmentLength: 2,
+        },
+      ),
+    );
+
+    const startedAt = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - startedAt;
+      const progress = Math.min(1, elapsed / PREVIEW_MORPH_DURATION_MS);
+      setMorphPathDs(interpolators.map((morph) => morph(progress)));
+
+      if (progress < 1) {
+        morphRafIdRef.current = window.requestAnimationFrame(animate);
+      } else {
+        morphRafIdRef.current = null;
+      }
+    };
+
+    morphRafIdRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (morphRafIdRef.current !== null) {
+        window.cancelAnimationFrame(morphRafIdRef.current);
+        morphRafIdRef.current = null;
+      }
+    };
+  }, [activePreviewMorph?.key, canPathMorph]);
+
   return (
     <div className="app">
-      {(game.phase === "playing" || game.phase === "shuffling") && (
+      {game.phase === "playing" && (
         <div className="game-progress-ring" aria-label="Postęp ubierania">
           <svg
             className="game-progress-svg"
@@ -316,48 +415,45 @@ function App() {
       <div
         className={`figure-area${game.phase !== "setup" ? " figure-area-game" : ""}${game.phase === "setup" && mobileTab !== "preview" ? " mobile-hidden" : ""}`}
       >
-        {(game.phase === "playing" || game.phase === "shuffling") &&
-          currentItem && (
-            <div className="game-stage-panel">
-              <div className="game-panel">
-                <p className="game-prompt">
-                  {game.phase === "shuffling"
-                    ? "Losowanie ubrania..."
-                    : "Załóż teraz:"}
-                </p>
-                <div
-                  className={`cloth-preview-frame${game.phase === "shuffling" ? " is-shuffling" : ""}`}
+        {game.phase === "playing" && currentItem && (
+          <div className="game-stage-panel">
+            <div className="game-panel">
+              <p className="game-prompt">Załóż teraz:</p>
+              <div
+                className={`cloth-preview-frame${isPreviewMorphing ? " is-morphing" : ""}`}
+              >
+                <svg
+                  className="cloth-preview"
+                  viewBox="0 0 420 390"
+                  xmlns="http://www.w3.org/2000/svg"
+                  role="img"
+                  aria-label={`Podgląd ubrania: ${currentItem.label}`}
                 >
-                  <svg
-                    key={
-                      game.phase === "shuffling"
-                        ? `${currentItem.id}-${game.index}`
-                        : currentItem.id
-                    }
-                    className={`cloth-preview${game.phase === "shuffling" ? " is-flying" : ""}`}
-                    viewBox="0 0 420 390"
-                    xmlns="http://www.w3.org/2000/svg"
-                    role="img"
-                    aria-label={`Podgląd ubrania: ${currentItem.label}`}
-                  >
-                    {currentItem.svgLayer}
-                  </svg>
-                </div>
-                <p className="game-item-name">
-                  <span
-                    key={
-                      game.phase === "shuffling"
-                        ? `${currentItem.id}-label-${game.index}`
-                        : currentItem.id
-                    }
-                    className="game-item-name-text"
-                  >
-                    {currentItem.label}
-                  </span>
-                </p>
+                  {shouldRenderPathMorph &&
+                  activePreviewMorph &&
+                  morphPathDs ? (
+                    <g key={`morph-${activePreviewMorph.key}`}>
+                      {morphToPaths.map((targetPath, index) => (
+                        <path
+                          key={`morph-path-${activePreviewMorph.key}-${index}`}
+                          {...targetPath.props}
+                          d={morphPathDs[index] ?? targetPath.d}
+                        />
+                      ))}
+                    </g>
+                  ) : (
+                    <g key={currentItem.id}>{currentItem.svgLayer}</g>
+                  )}
+                </svg>
               </div>
+              <p className="game-item-name">
+                <span key={currentItem.id} className="game-item-name-text">
+                  {currentItem.label}
+                </span>
+              </p>
             </div>
-          )}
+          </div>
+        )}
 
         {game.phase === "done" && (
           <div className="game-stage-panel">
