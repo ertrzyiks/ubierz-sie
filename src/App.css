@@ -229,6 +229,8 @@
   gap: 1rem;
   justify-content: center;
   text-align: center;
+  position: relative;
+  overflow: visible;
 }
 
 .game-progress-ring {
@@ -290,24 +292,66 @@
   display: grid;
   place-items: center;
   position: relative;
+  isolation: isolate;
+  z-index: 2;
 }
 
 .cloth-preview-frame.is-morphing {
-  background: color-mix(in srgb, var(--accent-bg) 58%, var(--bg) 42%);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent 60%),
-    0 0 24px color-mix(in srgb, var(--accent) 28%, transparent 72%);
+  background: color-mix(in srgb, var(--bg) 90%, white 10%);
   animation: morph-frame-pulse 0.76s ease-out;
+  overflow: visible;
 }
 
 .cloth-preview {
   display: block;
   width: 100%;
   height: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .cloth-preview-frame.is-morphing .cloth-preview {
   filter: saturate(1.28) contrast(1.08);
+}
+
+.morph-particles {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 42px);
+  width: 260px;
+  height: 260px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.morph-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--particle-size);
+  height: var(--particle-size);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  background: color-mix(in srgb, var(--text-h) 72%, white 28%);
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 92%,
+    50% 71%,
+    21% 92%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+  animation-name: morph-particle-burst;
+  animation-duration: var(--particle-duration);
+  animation-delay: var(--particle-delay);
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .game-item-name {
@@ -390,6 +434,38 @@
 
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes morph-particle-burst {
+  0% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--particle-start-x)),
+        calc(-50% + var(--particle-start-y))
+      )
+      scale(0.2) rotate(0deg);
+  }
+
+  12% {
+    opacity: 0.95;
+  }
+
+  62% {
+    opacity: 0.72;
+  }
+
+  84% {
+    opacity: 0.4;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--particle-end-x)),
+        calc(-50% + var(--particle-end-y))
+      )
+      scale(0.58) rotate(var(--particle-rot));
   }
 }
 

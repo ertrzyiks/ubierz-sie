@@ -1,9 +1,11 @@
 import {
   Children,
+  type CSSProperties,
   isValidElement,
   type ReactNode,
   type SVGProps,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -42,7 +44,75 @@ interface SvgPathDescriptor {
   props: Omit<SVGProps<SVGPathElement>, "d" | "children">;
 }
 
-const PREVIEW_MORPH_DURATION_MS = 760;
+const MORPH_PARTICLE_WAVE_SIZE = 50;
+const MORPH_PARTICLE_MAX_DELAY_MS = 80;
+const MORPH_PARTICLE_MIN_DURATION_MS = 900;
+const MORPH_PARTICLE_MAX_DURATION_MS = 1500;
+const MORPH_PARTICLE_START_RADIUS_MIN = 24;
+const MORPH_PARTICLE_START_RADIUS_MAX = 58;
+const MORPH_PARTICLE_TRAVEL_EXTRA_MIN = 70;
+const MORPH_PARTICLE_TRAVEL_EXTRA_MAX = 132;
+const MORPH_PARTICLE_CLEAR_DELAY_MS =
+  MORPH_PARTICLE_MAX_DELAY_MS + MORPH_PARTICLE_MAX_DURATION_MS + 140;
+
+interface MorphParticle {
+  id: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  size: number;
+  rotate: number;
+  delay: number;
+  duration: number;
+}
+
+interface MorphParticleWave {
+  id: number;
+  particles: MorphParticle[];
+}
+
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildMorphParticles(seed: number, count: number): MorphParticle[] {
+  const random = createSeededRandom(seed);
+
+  return Array.from({ length: count }, (_, id) => {
+    const angle = random() * Math.PI * 2;
+    const startRadius =
+      MORPH_PARTICLE_START_RADIUS_MIN +
+      random() *
+        (MORPH_PARTICLE_START_RADIUS_MAX - MORPH_PARTICLE_START_RADIUS_MIN);
+    const endRadius =
+      startRadius +
+      MORPH_PARTICLE_TRAVEL_EXTRA_MIN +
+      random() *
+        (MORPH_PARTICLE_TRAVEL_EXTRA_MAX - MORPH_PARTICLE_TRAVEL_EXTRA_MIN);
+
+    return {
+      id,
+      startX: Math.cos(angle) * startRadius,
+      startY: Math.sin(angle) * startRadius,
+      endX: Math.cos(angle) * endRadius,
+      endY: Math.sin(angle) * endRadius,
+      size: 5 + random() * 8,
+      rotate: -220 + random() * 440,
+      delay: random() * MORPH_PARTICLE_MAX_DELAY_MS,
+      duration:
+        MORPH_PARTICLE_MIN_DURATION_MS +
+        random() *
+          (MORPH_PARTICLE_MAX_DURATION_MS - MORPH_PARTICLE_MIN_DURATION_MS),
+    };
+  });
+}
 
 function collectSvgPathDescriptors(node: ReactNode): SvgPathDescriptor[] {
   const descriptors: SvgPathDescriptor[] = [];
@@ -86,10 +156,18 @@ function App() {
   const [mobileTab, setMobileTab] = useState<MobileTab>(initialState.mobileTab);
   const [previewMorph, setPreviewMorph] =
     useState<PreviewMorphTransition | null>(null);
+  const [particleEmitterKey, setParticleEmitterKey] = useState<number | null>(
+    null,
+  );
   const [morphPathDs, setMorphPathDs] = useState<string[] | null>(null);
+  const [morphParticleWaves, setMorphParticleWaves] = useState<
+    MorphParticleWave[]
+  >([]);
   const previousPreviewItemIdRef = useRef<string | null>(null);
   const morphTimeoutIdRef = useRef<number | null>(null);
   const morphRafIdRef = useRef<number | null>(null);
+  const morphParticleCleanupTimeoutIdRef = useRef<number | null>(null);
+  const morphParticleWaveIdRef = useRef(0);
 
   function renderLudzikOutline() {
     return (
@@ -254,7 +332,7 @@ function App() {
       ? progressCircumference * (1 - progressValue / progressTotal)
       : progressCircumference;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (morphTimeoutIdRef.current !== null) {
       window.clearTimeout(morphTimeoutIdRef.current);
       morphTimeoutIdRef.current = null;
@@ -262,6 +340,7 @@ function App() {
 
     if (game.phase !== "playing" || !currentItemId) {
       setPreviewMorph(null);
+      setParticleEmitterKey(null);
       previousPreviewItemIdRef.current = null;
       return;
     }
@@ -274,13 +353,15 @@ function App() {
         key: Date.now(),
       };
       setPreviewMorph(nextMorph);
+      setParticleEmitterKey(nextMorph.key);
       morphTimeoutIdRef.current = window.setTimeout(() => {
         setPreviewMorph((current) =>
           current && current.key === nextMorph.key ? null : current,
         );
-      }, PREVIEW_MORPH_DURATION_MS);
+      }, 1000);
     } else {
       setPreviewMorph(null);
+      setParticleEmitterKey(null);
     }
 
     previousPreviewItemIdRef.current = currentItemId;
@@ -293,6 +374,9 @@ function App() {
       }
       if (morphRafIdRef.current !== null) {
         window.cancelAnimationFrame(morphRafIdRef.current);
+      }
+      if (morphParticleCleanupTimeoutIdRef.current !== null) {
+        window.clearTimeout(morphParticleCleanupTimeoutIdRef.current);
       }
     };
   }, []);
@@ -317,10 +401,37 @@ function App() {
     : [];
   const canPathMorph =
     isPreviewMorphing && morphFromPaths.length > 0 && morphToPaths.length > 0;
-  const shouldRenderPathMorph =
-    canPathMorph && Boolean(activePreviewMorph) && Boolean(morphPathDs);
-
+  const shouldRenderPathMorph = canPathMorph && Boolean(activePreviewMorph);
   useEffect(() => {
+    if (morphParticleCleanupTimeoutIdRef.current !== null) {
+      window.clearTimeout(morphParticleCleanupTimeoutIdRef.current);
+      morphParticleCleanupTimeoutIdRef.current = null;
+    }
+
+    if (particleEmitterKey === null) {
+      morphParticleCleanupTimeoutIdRef.current = window.setTimeout(() => {
+        setMorphParticleWaves([]);
+      }, MORPH_PARTICLE_CLEAR_DELAY_MS);
+      return;
+    }
+
+    setMorphParticleWaves([]);
+
+    const spawnWave = () => {
+      const waveId = ++morphParticleWaveIdRef.current;
+      const particles = buildMorphParticles(
+        particleEmitterKey + waveId * 7919,
+        MORPH_PARTICLE_WAVE_SIZE,
+      );
+
+      setMorphParticleWaves([{ id: waveId, particles }]);
+    };
+
+    spawnWave();
+    return;
+  }, [particleEmitterKey]);
+
+  useLayoutEffect(() => {
     if (morphRafIdRef.current !== null) {
       window.cancelAnimationFrame(morphRafIdRef.current);
       morphRafIdRef.current = null;
@@ -340,11 +451,12 @@ function App() {
         },
       ),
     );
+    setMorphPathDs(interpolators.map((morph) => morph(0)));
 
     const startedAt = performance.now();
     const animate = (now: number) => {
       const elapsed = now - startedAt;
-      const progress = Math.min(1, elapsed / PREVIEW_MORPH_DURATION_MS);
+      const progress = Math.min(1, elapsed / 1000);
       setMorphPathDs(interpolators.map((morph) => morph(progress)));
 
       if (progress < 1) {
@@ -419,6 +531,30 @@ function App() {
           <div className="game-stage-panel">
             <div className="game-panel">
               <p className="game-prompt">Załóż teraz:</p>
+              {morphParticleWaves.length > 0 && (
+                <div className="morph-particles" aria-hidden="true">
+                  {morphParticleWaves.map((wave) =>
+                    wave.particles.map((particle) => (
+                      <span
+                        key={`${particleEmitterKey}-${wave.id}-${particle.id}`}
+                        className="morph-particle"
+                        style={
+                          {
+                            "--particle-start-x": `${particle.startX}px`,
+                            "--particle-start-y": `${particle.startY}px`,
+                            "--particle-end-x": `${particle.endX}px`,
+                            "--particle-end-y": `${particle.endY}px`,
+                            "--particle-size": `${particle.size}px`,
+                            "--particle-rot": `${particle.rotate}deg`,
+                            "--particle-delay": `${particle.delay}ms`,
+                            "--particle-duration": `${particle.duration}ms`,
+                          } as CSSProperties
+                        }
+                      />
+                    )),
+                  )}
+                </div>
+              )}
               <div
                 className={`cloth-preview-frame${isPreviewMorphing ? " is-morphing" : ""}`}
               >
@@ -431,13 +567,17 @@ function App() {
                 >
                   {shouldRenderPathMorph &&
                   activePreviewMorph &&
-                  morphPathDs ? (
+                  morphFromPaths.length > 0 ? (
                     <g key={`morph-${activePreviewMorph.key}`}>
                       {morphToPaths.map((targetPath, index) => (
                         <path
                           key={`morph-path-${activePreviewMorph.key}-${index}`}
                           {...targetPath.props}
-                          d={morphPathDs[index] ?? targetPath.d}
+                          d={
+                            morphPathDs?.[index] ??
+                            morphFromPaths[index % morphFromPaths.length]?.d ??
+                            targetPath.d
+                          }
                         />
                       ))}
                     </g>
